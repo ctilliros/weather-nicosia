@@ -1,2 +1,6 @@
 psycopg2
 pandas
+timeloop
+geopandas
+requests
+pytz

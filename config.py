@@ -1,4 +1,4 @@
-host = "postgres111"
+host = "postgres"
 user = "admin"
 port = '5432'
 database = "inicosia"
