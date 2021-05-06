@@ -11,7 +11,8 @@ import requests
 from dateutil import tz
 
 def db_connect():
-	conn = psycopg2.connect(host=host, options='-c statement_timeout=30s', dbname=database, user=user, password=password)    	
+	# conn = psycopg2.connect(host=host, options='-c statement_timeout=30s', dbname=database, user=user, password=password)    	
+	conn = psycopg2.connect(host="localhost", options='-c statement_timeout=30s', dbname="testing", user="postgres", password="9664241907")    
 	cursor = conn.cursor()
 	return conn, cursor 
 
@@ -45,9 +46,22 @@ def readfiles_data(name):
 	f.close()
 	return file_data
 
+def add_data(id_coords, id_date, main, wind, desc, data,cursor,conn):
+	print(id_coords[0], id_date[0], main['temp'], main['feels_like'], 
+						 main['temp_min'], main['temp_max'],main['pressure'],main['humidity'],
+						 data['visibility'],wind['speed'],wind['deg'],
+						 data['clouds']['all'],desc['description'],desc['icon'])
+	sql = 'insert into weather_values(id_weather_coordsfk,id_weather_datesfk,temp,\
+				feels_like,temp_min,temp_max,pressure,humidity,visibility,wind_speed,wind_deg,\
+				clouds_all,description,icon) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'				
+	cursor.execute(sql, (id_coords[0], id_date[0], main['temp'], main['feels_like'], 
+						 main['temp_min'], main['temp_max'],main['pressure'],main['humidity'],
+						 data['visibility'],wind['speed'],wind['deg'],
+						 data['clouds']['all'],desc['description'],desc['icon'],))
+	conn.commit()
 
 tl = Timeloop()
-@tl.job(interval=timedelta(seconds=300))
+@tl.job(interval=timedelta(seconds=60))
 def sample_job_every_1000s():
 	nicosia_areas = 'nicosia_mun_areas.json'
 	postal_codes = 'nicosia_postcodes_with_population.json'
@@ -86,23 +100,29 @@ def sample_job_every_1000s():
 			cursor.execute(sql,(time,))
 			id_date = cursor.fetchone()
 			conn.commit()
+			main = data['main']
+			wind = data['wind']
+			desc = data['weather'][0]
 			if not id_date:
 				sql = 'insert into weather_dates (datetime) values (%s) returning id'
 				cursor.execute(sql,(time,))
 				id_date = cursor.fetchone()
 				conn.commit()
-				sql = 'insert into weather_values(id_weather_coordsfk,id_weather_datesfk,temp,\
-				feels_like,temp_min,temp_max,pressure,humidity,visibility,wind_speed,wind_deg,\
-				clouds_all,description,icon) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'
-				main = data['main']
-				wind = data['wind']
-				desc = data['weather'][0]
+				add_data(id_coords, id_date, main, wind, desc, data, cursor, conn)				
+			else:
+				sql = 'select * from weather_values where id_weather_coordsfk=%s and id_weather_datesfk=%s and temp=%s and \
+				feels_like=%s and temp_min=%s and temp_max=%s and pressure=%s and humidity=%s and visibility=%s and wind_speed=%s and wind_deg=%s and \
+				clouds_all=%s and description=%s and icon=%s'
 				cursor.execute(sql, (id_coords[0], id_date[0], main['temp'], main['feels_like'], 
 									 main['temp_min'], main['temp_max'],main['pressure'],main['humidity'],
 									 data['visibility'],wind['speed'],wind['deg'],
 									 data['clouds']['all'],desc['description'],desc['icon'],))
-				conn.commit()
-				print("Values Added Properly")
+				data_db = cursor.fetchall()
+				if not data_db:
+					add_data(id_coords, id_date, main, wind, desc, data,cursor,conn)				
+					print("Values Added Properly")
+				else:
+					print("Yparxoun idi")
 		except psycopg2.Error as e:
 			print(e)
 			continue
