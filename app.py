@@ -11,8 +11,7 @@ import requests
 from dateutil import tz
 
 def db_connect():
-	# conn = psycopg2.connect(host=host, options='-c statement_timeout=30s', dbname=database, user=user, password=password)    	
-	conn = psycopg2.connect(host="localhost", options='-c statement_timeout=30s', dbname="testing", user="postgres", password="9664241907")    
+	conn = psycopg2.connect(host=host, options='-c statement_timeout=30s', dbname=database, user=user, password=password)	
 	cursor = conn.cursor()
 	return conn, cursor 
 
@@ -47,10 +46,6 @@ def readfiles_data(name):
 	return file_data
 
 def add_data(id_coords, id_date, main, wind, desc, data,cursor,conn):
-	print(id_coords[0], id_date[0], main['temp'], main['feels_like'], 
-						 main['temp_min'], main['temp_max'],main['pressure'],main['humidity'],
-						 data['visibility'],wind['speed'],wind['deg'],
-						 data['clouds']['all'],desc['description'],desc['icon'])
 	sql = 'insert into weather_values(id_weather_coordsfk,id_weather_datesfk,temp,\
 				feels_like,temp_min,temp_max,pressure,humidity,visibility,wind_speed,wind_deg,\
 				clouds_all,description,icon) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'				
@@ -119,10 +114,7 @@ def sample_job_every_1000s():
 									 data['clouds']['all'],desc['description'],desc['icon'],))
 				data_db = cursor.fetchall()
 				if not data_db:
-					add_data(id_coords, id_date, main, wind, desc, data,cursor,conn)				
-					print("Values Added Properly")
-				else:
-					print("Yparxoun idi")
+					add_data(id_coords, id_date, main, wind, desc, data,cursor,conn)											
 		except psycopg2.Error as e:
 			print(e)
 			continue
