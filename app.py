@@ -11,7 +11,8 @@ import requests
 from dateutil import tz
 
 def db_connect():
-	conn = psycopg2.connect(host=host, options='-c statement_timeout=30s', dbname=database, user=user, password=password)	
+	# conn = psycopg2.connect(host=host, options='-c statement_timeout=30s', dbname=database, user=user, password=password)    	
+	conn = psycopg2.connect(host="localhost", options='-c statement_timeout=30s', dbname="testing", user="postgres", password="9664241907")    
 	cursor = conn.cursor()
 	return conn, cursor 
 
@@ -74,52 +75,60 @@ def sample_job_every_1000s():
 	for k in fx.index:
 		conn, cursor = db_connect()
 		url = 'https://api.openweathermap.org/data/2.5/weather?lat='+str(fx[k])+'&lon='+str(fy[k])+'&appid=61294daffa9aebd52ab68eec334b5882&units=metric'
-		request = requests.get(url)
-		data = request.json()
-
-		data['time']=datetime.fromtimestamp(data['dt'], pytz.timezone("Asia/Nicosia")).strftime("%Y-%m-%d %H:%M:%S")
 		try:
-			lat = data['coord']['lat']
-			lon = data['coord']['lon']   
-			time = data['time']
-			sql = 'select id from weather_coords where lat = %s and lon = %s'
-			cursor.execute(sql,(lat,lon,))    
-			id_coords = cursor.fetchone()
-			conn.commit()
-			if not id_coords:
-				sql = 'insert into weather_coords (lat,lon) values (%s, %s) returning id'
-				cursor.execute(sql,(lat,lon))
+			request = requests.get(url)
+		except (
+		requests.ConnectionError,
+		requests.exceptions.ReadTimeout,
+		requests.exceptions.Timeout,
+		requests.exceptions.ConnectTimeout,) as e:        	
+			print(e)
+		if request: 
+			data = request.json()
+
+			data['time']=datetime.fromtimestamp(data['dt'], pytz.timezone("Asia/Nicosia")).strftime("%Y-%m-%d %H:%M")
+			try:
+				lat = data['coord']['lat']
+				lon = data['coord']['lon']   
+				time = data['time']
+				sql = 'select id from weather_coords where lat = %s and lon = %s'
+				cursor.execute(sql,(lat,lon,))    
 				id_coords = cursor.fetchone()
 				conn.commit()
-			sql = 'select id from weather_dates where datetime = %s'
-			cursor.execute(sql,(time,))
-			id_date = cursor.fetchone()
-			conn.commit()
-			main = data['main']
-			wind = data['wind']
-			desc = data['weather'][0]
-			if not id_date:
-				sql = 'insert into weather_dates (datetime) values (%s) returning id'
+				if not id_coords:
+					sql = 'insert into weather_coords (lat,lon) values (%s, %s) returning id'
+					cursor.execute(sql,(lat,lon))
+					id_coords = cursor.fetchone()
+					conn.commit()
+				sql = 'select id from weather_dates where datetime = %s'
 				cursor.execute(sql,(time,))
 				id_date = cursor.fetchone()
 				conn.commit()
-				add_data(id_coords, id_date, main, wind, desc, data, cursor, conn)				
-			else:
-				sql = 'select * from weather_values where id_weather_coordsfk=%s and id_weather_datesfk=%s and temp=%s and \
-				feels_like=%s and temp_min=%s and temp_max=%s and pressure=%s and humidity=%s and visibility=%s and wind_speed=%s and wind_deg=%s and \
-				clouds_all=%s and description=%s and icon=%s'
-				cursor.execute(sql, (id_coords[0], id_date[0], main['temp'], main['feels_like'], 
-									 main['temp_min'], main['temp_max'],main['pressure'],main['humidity'],
-									 data['visibility'],wind['speed'],wind['deg'],
-									 data['clouds']['all'],desc['description'],desc['icon'],))
-				data_db = cursor.fetchall()
-				if not data_db:
-					add_data(id_coords, id_date, main, wind, desc, data,cursor,conn)											
-		except psycopg2.Error as e:
-			print(e)
-			continue
-		finally:
-			conn.close()
+				main = data['main']
+				wind = data['wind']
+				desc = data['weather'][0]
+				if not id_date:
+					sql = 'insert into weather_dates (datetime) values (%s) returning id'
+					cursor.execute(sql,(time,))
+					id_date = cursor.fetchone()
+					conn.commit()
+					add_data(id_coords, id_date, main, wind, desc, data, cursor, conn)				
+				else:
+					sql = 'select * from weather_values where id_weather_coordsfk=%s and id_weather_datesfk=%s and temp=%s and \
+					feels_like=%s and temp_min=%s and temp_max=%s and pressure=%s and humidity=%s and visibility=%s and wind_speed=%s and wind_deg=%s and \
+					clouds_all=%s and description=%s and icon=%s'
+					cursor.execute(sql, (id_coords[0], id_date[0], main['temp'], main['feels_like'], 
+										 main['temp_min'], main['temp_max'],main['pressure'],main['humidity'],
+										 data['visibility'],wind['speed'],wind['deg'],
+										 data['clouds']['all'],desc['description'],desc['icon'],))
+					data_db = cursor.fetchall()
+					if not data_db:
+						add_data(id_coords, id_date, main, wind, desc, data,cursor,conn)											
+			except psycopg2.Error as e:
+				print(e)
+				continue
+			finally:
+				conn.close()
 
 if __name__ == "__main__":
 	create_db()
